@@ -1,0 +1,10 @@
+# Binaries
+/bin/
+main
+my-app.exe
+
+# Environment Variables (Secrets)
+.env
+
+# OS Files
+.DS_Store
