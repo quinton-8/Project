@@ -1,0 +1,17 @@
+The app focuses on children's doctors and marketing should be done to parents in lower primary, private and public schools
+Advertisement can be done via posters on local hospitals and ensuring there is a QR code to get the app where we also enrol the doctors and nurses
+Find contractual based doctors or surgeons on hospitals through their advertisements or locals
+The project starts by enrolling the doctors first or pharmaceuticals to the app and collecting their data atleast all of kisumu first then market to kisumu
+residents then expand to outskirts
+Details of doctors should be present before clients in the respective cities can be enrolled
+Location of the client is updated as per that particular time or saved and the client gets to choose the pickup point
+The doctor gives the client a schedule including traveling time and the client confirms if that particular time deems apropriet for both parties then
+then the client books the doctor for that particular time via paying for the transport cost or inputing hospilat details or health card or details including 
+ might also select for free checkup or at a low price just to seal the agreement.
+Incase of cancelation spot is available to the next incoming user as already registered users cannot change times
+This is all to avoid cloging on hospitals and users willhave a rating on the amont of time spent on the waiting already
+Project is best suited for independent doctors or lower packed hospitals at first as patients in hospitals are already clogged
+In the case of patients showing up without using the app, the doctor is to valuate the amount of time untill a probably free timeline
+The app should ask whether the transport is to be provided to the client before hand, a confirmation message containing the time of departure is to be clicked 
+and in the case it is not an sms is to be sent after a short period of time
+
