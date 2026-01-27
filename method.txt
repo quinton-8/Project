@@ -14,4 +14,12 @@ Project is best suited for independent doctors or lower packed hospitals at firs
 In the case of patients showing up without using the app, the doctor is to valuate the amount of time untill a probably free timeline
 The app should ask whether the transport is to be provided to the client before hand, a confirmation message containing the time of departure is to be clicked 
 and in the case it is not an sms is to be sent after a short period of time
+The app is to do and have all the necessary features first beauty or model comes later
+Its main purpose is to provide accurate checkups and arrival time and where necessary it can provide modes of transport
+It should have nearest hospitals at selected location
+One can book a checkup immediately for that day or even a later date.
+One can view the congestion at the moment and choose to select if willing to book or look for the nearest empty slot
+at a top rated station or nearest station 
+Can also be handy while traveling or in anew environment 
+
 
