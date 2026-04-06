@@ -12,6 +12,7 @@ type DataStore struct {
 	Doctors      map[string]models.Doctor
 	Clients      map[string]models.Client
 	Appointments map[string]models.Appointment
+	Hospitals    map[string]models.Hospital
 }
 
 // NewDataStore initializes the store with some hardcoded seed data
@@ -20,34 +21,58 @@ func NewDataStore() *DataStore {
 		Doctors:      make(map[string]models.Doctor),
 		Clients:      make(map[string]models.Client),
 		Appointments: make(map[string]models.Appointment),
+		Hospitals:    make(map[string]models.Hospital),
 	}
 
-	// Seed Data: Contractual and Independent Doctors in the target region
+	// Seed Data: Hospitals in Kisumu
+	store.Hospitals["hosp-1"] = models.Hospital{
+		ID:   "hosp-1",
+		Name: "Aga Khan Hospital Kisumu",
+		Lat:  -0.1035,
+		Lng:  34.7550,
+	}
+	store.Hospitals["hosp-2"] = models.Hospital{
+		ID:   "hosp-2",
+		Name: "Jaramogi Oginga Odinga Teaching and Referral Hospital",
+		Lat:  -0.0900,
+		Lng:  34.7700,
+	}
+	store.Hospitals["hosp-3"] = models.Hospital{
+		ID:   "hosp-3",
+		Name: "Milimani Independent Clinic",
+		Lat:  -0.1100,
+		Lng:  34.7500,
+	}
+
+// Seed Data: Contractual and Independent Doctors in the target region
 	store.Doctors["doc-1"] = models.Doctor{
-		ID:            "doc-1",
-		Name:          "Dr. Sarah Ochieng",
-		Specialty:     "Pediatrician",
-		Hospital:      "Aga Khan Hospital Kisumu",
-		IsContractual: true,
-		City:          "Kisumu",
-		IsEnrolled:    true,
-		AvailableTime: []time.Time{
-			time.Now().Add(2 * time.Hour),  // Available in 2 hours
-			time.Now().Add(24 * time.Hour), // Available tomorrow
-		},
+		ID:             "doc-1",
+		Name:           "Dr. Sarah Ochieng",
+		Specialty:      "Pediatrician",
+		Hospital:       "Aga Khan Hospital Kisumu", // Major hospital
+		IsContractual:  true,
+		City:           "Kisumu",
+		IsEnrolled:     true,
+		AvailableTime:  []time.Time{time.Now().Add(2 * time.Hour)},
+		Lat:            -0.1035,
+		Lng:            34.7550,
+		CurrentQueue:   12, // Crowded: 12 patients waiting
+		AvgConsultTime: 15, // 15 mins per patient = 180 minutes wait time
 	}
 
 	store.Doctors["doc-2"] = models.Doctor{
-		ID:            "doc-2",
-		Name:          "Dr. David Kamau",
-		Specialty:     "Pediatric Surgeon",
-		Hospital:      "Independent Clinic - Milimani",
-		IsContractual: false,
-		City:          "Kisumu",
-		IsEnrolled:    true,
-		AvailableTime: []time.Time{
-			time.Now().Add(4 * time.Hour),
-		},
+		ID:             "doc-2",
+		Name:           "Dr. David Kamau",
+		Specialty:      "Pediatric Surgeon",
+		Hospital:       "Independent Clinic - Milimani", // Independent
+		IsContractual:  false,
+		City:           "Kisumu",
+		IsEnrolled:     true,
+		AvailableTime:  []time.Time{time.Now().Add(1 * time.Hour)},
+		Lat:            -0.1100,
+		Lng:            34.7500,
+		CurrentQueue:   1,  // Nearly empty: 1 patient waiting
+		AvgConsultTime: 20, // 20 mins per patient = 20 minutes wait time
 	}
 
 	return store
