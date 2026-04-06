@@ -3,7 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
+	"sort"
+	"strconv"
 	"time"
 
 	"github.com/quinton-8/project/internal/database"
@@ -74,4 +77,180 @@ func (h *AppHandler) BookAppointment(w http.ResponseWriter, r *http.Request) {
 		"message":     message,
 		"appointment": req,
 	})
+}
+
+// ConfirmAppointment finalizes the booking after transport/time agreement
+func (h *AppHandler) ConfirmAppointment(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AppointmentID string `json:"appointment_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.Store.GetAppointment(req.AppointmentID)
+	if err != nil {
+		http.Error(w, "Appointment not found", http.StatusNotFound)
+		return
+	}
+
+	if app.Status == "cancelled" {
+		http.Error(w, "Cannot confirm a cancelled appointment", http.StatusBadRequest)
+		return
+	}
+
+	app.Status = "confirmed"
+	h.Store.UpdateAppointment(app)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Appointment and transport departure time successfully confirmed.",
+		"status":  app.Status,
+	})
+}
+
+// CancelAppointment handles cancellations and frees up the queue
+func (h *AppHandler) CancelAppointment(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AppointmentID string `json:"appointment_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	app, err := h.Store.GetAppointment(req.AppointmentID)
+	if err != nil {
+		http.Error(w, "Appointment not found", http.StatusNotFound)
+		return
+	}
+
+	app.Status = "cancelled"
+	h.Store.UpdateAppointment(app)
+
+	// Note: In a full database, you would also trigger a function here to notify 
+	// the next user in the "waiting" queue that a spot has opened up.
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Appointment cancelled. The spot has been made available to the next incoming user.",
+		"status":  app.Status,
+	})
+}
+
+// haversineDistance calculates the distance between two coordinates in kilometers
+func haversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371.0 // Earth radius in kilometers
+	
+	// Convert degrees to radians
+	lat1Rad := lat1 * math.Pi / 180
+	lon1Rad := lon1 * math.Pi / 180
+	lat2Rad := lat2 * math.Pi / 180
+	lon2Rad := lon2 * math.Pi / 180
+
+	dLat := lat2Rad - lat1Rad
+	dLon := lon2Rad - lon1Rad
+
+	a := math.Pow(math.Sin(dLat/2), 2) + math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Pow(math.Sin(dLon/2), 2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	return R * c
+}
+
+// GetNearestHospitals returns hospitals sorted by distance from the user's location
+func (h *AppHandler) GetNearestHospitals(w http.ResponseWriter, r *http.Request) {
+	// 1. Get coordinates from the URL query
+	latStr := r.URL.Query().Get("lat")
+	lngStr := r.URL.Query().Get("lng")
+
+	userLat, errLat := strconv.ParseFloat(latStr, 64)
+	userLng, errLng := strconv.ParseFloat(lngStr, 64)
+
+	if errLat != nil || errLng != nil {
+		http.Error(w, "Invalid latitude or longitude provided", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Calculate distance for all hospitals
+	type HospitalWithDistance struct {
+		models.Hospital
+		DistanceKM float64 `json:"distance_km"`
+	}
+
+	var results []HospitalWithDistance
+	for _, hosp := range h.Store.Hospitals {
+		dist := haversineDistance(userLat, userLng, hosp.Lat, hosp.Lng)
+		results = append(results, HospitalWithDistance{
+			Hospital:   hosp,
+			DistanceKM: math.Round(dist*100) / 100, // Round to 2 decimal places
+		})
+	}
+
+	// 3. Sort the results from closest to furthest
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].DistanceKM < results[j].DistanceKM
+	})
+
+	// 4. Send response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+// SmartMatchDoctors sorts doctors by "Total Time to Seen" (Travel Time + Wait Time)
+func (h *AppHandler) SmartMatchDoctors(w http.ResponseWriter, r *http.Request) {
+	// 1. Get user coordinates
+	latStr := r.URL.Query().Get("lat")
+	lngStr := r.URL.Query().Get("lng")
+
+	userLat, errLat := strconv.ParseFloat(latStr, 64)
+	userLng, errLng := strconv.ParseFloat(lngStr, 64)
+
+	if errLat != nil || errLng != nil {
+		http.Error(w, "Invalid latitude or longitude provided", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Struct to hold the calculated metrics for the response
+	type SmartMatchResult struct {
+		models.Doctor
+		DistanceKM      float64 `json:"distance_km"`
+		EstTravelTime   int     `json:"est_travel_time_mins"`
+		EstWaitTime     int     `json:"est_wait_time_mins"`
+		TotalTimeToSeen int     `json:"total_time_to_seen_mins"`
+	}
+
+	var results []SmartMatchResult
+
+	// 3. Calculate times for all enrolled Kisumu doctors
+	for _, doc := range h.Store.Doctors {
+		if doc.City == "Kisumu" && doc.IsEnrolled {
+			// Calculate Distance
+			dist := haversineDistance(userLat, userLng, doc.Lat, doc.Lng)
+			
+			// Estimate Travel Time: Assume 30 km/h average city speed (0.5 km/min)
+			// Travel Time = Distance / 0.5 -> which is Distance * 2
+			travelTime := int(math.Round(dist * 2)) 
+
+			// Estimate Wait Time: Queue length * Average consultation time
+			waitTime := doc.CurrentQueue * doc.AvgConsultTime
+
+			results = append(results, SmartMatchResult{
+				Doctor:          doc,
+				DistanceKM:      math.Round(dist*100) / 100,
+				EstTravelTime:   travelTime,
+				EstWaitTime:     waitTime,
+				TotalTimeToSeen: travelTime + waitTime,
+			})
+		}
+	}
+
+	// 4. Sort the results: Smallest "TotalTimeToSeen" goes first (The Equalizer)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].TotalTimeToSeen < results[j].TotalTimeToSeen
+	})
+
+	// 5. Return the sorted optimal list
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
 }
