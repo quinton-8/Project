@@ -58,6 +58,7 @@ func NewDataStore() *DataStore {
 		Lng:            34.7550,
 		CurrentQueue:   12, // Crowded: 12 patients waiting
 		AvgConsultTime: 15, // 15 mins per patient = 180 minutes wait time
+		Rating:         4.8, // High rating, but in a hospital
 	}
 
 	store.Doctors["doc-2"] = models.Doctor{
@@ -73,6 +74,23 @@ func NewDataStore() *DataStore {
 		Lng:            34.7500,
 		CurrentQueue:   1,  // Nearly empty: 1 patient waiting
 		AvgConsultTime: 20, // 20 mins per patient = 20 minutes wait time
+		Rating:         4.9, // Highest rated independent
+	}
+
+	store.Doctors["doc-3"] = models.Doctor{
+		ID:             "doc-3",
+		Name:           "Dr. Amina Hassan",
+		Specialty:      "Pediatrician",
+		Hospital:       "Independent Clinic - Nyalenda", // Independent
+		IsContractual:  false,
+		City:           "Kisumu",
+		IsEnrolled:     true,
+		AvailableTime:  []time.Time{time.Now().Add(30 * time.Minute)},
+		Lat:            -0.1200,
+		Lng:            34.7650,
+		CurrentQueue:   4,
+		AvgConsultTime: 15,
+		Rating:         4.6, // Solid independent rating
 	}
 
 	return store
