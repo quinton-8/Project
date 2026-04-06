@@ -12,6 +12,10 @@ type Doctor struct {
 	City          string // e.g., "Kisumu"
 	IsEnrolled    bool
 	AvailableTime []time.Time
+	Lat            float64   `json:"lat"`
+	Lng            float64   `json:"lng"`
+	CurrentQueue   int       `json:"current_queue"`      // Number of patients currently waiting
+	AvgConsultTime int       `json:"avg_consult_time"`   // Average minutes spent per patient
 }
 
 // Client represents the parent/patient using the app.
@@ -34,3 +38,12 @@ type Appointment struct {
 	TransportCost  float64
 	Status         string // "pending", "confirmed", "cancelled"
 }
+
+// Hospital represents a physical location for checkups
+type Hospital struct {
+	ID   string  `json:"id"`
+	Name string  `json:"name"`
+	Lat  float64 `json:"lat"`
+	Lng  float64 `json:"lng"`
+}
+
