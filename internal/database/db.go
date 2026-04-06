@@ -73,3 +73,20 @@ func (ds *DataStore) CreateAppointment(app models.Appointment) error {
 	return nil
 }
 
+// GetAppointment retrieves an appointment by its ID
+func (ds *DataStore) GetAppointment(id string) (models.Appointment, error) {
+	app, exists := ds.Appointments[id]
+	if !exists {
+		return models.Appointment{}, errors.New("appointment not found")
+	}
+	return app, nil
+}
+
+// UpdateAppointment replaces an existing appointment with updated data
+func (ds *DataStore) UpdateAppointment(app models.Appointment) error {
+	if _, exists := ds.Appointments[app.ID]; !exists {
+		return errors.New("appointment not found")
+	}
+	ds.Appointments[app.ID] = app
+	return nil
+}
