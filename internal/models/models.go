@@ -16,6 +16,7 @@ type Doctor struct {
 	Lng            float64   `json:"lng"`
 	CurrentQueue   int       `json:"current_queue"`      // Number of patients currently waiting
 	AvgConsultTime int       `json:"avg_consult_time"`   // Average minutes spent per patient
+	Rating         float64     `json:"rating"` // New field for top-rated categories
 }
 
 // Client represents the parent/patient using the app.
