@@ -197,9 +197,8 @@ func (h *AppHandler) GetNearestHospitals(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(results)
 }
 
-// SmartMatchDoctors sorts doctors by "Total Time to Seen" (Travel Time + Wait Time)
+// SmartMatchDoctors returns categorized lists to balance patient flow
 func (h *AppHandler) SmartMatchDoctors(w http.ResponseWriter, r *http.Request) {
-	// 1. Get user coordinates
 	latStr := r.URL.Query().Get("lat")
 	lngStr := r.URL.Query().Get("lng")
 
@@ -211,7 +210,6 @@ func (h *AppHandler) SmartMatchDoctors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Struct to hold the calculated metrics for the response
 	type SmartMatchResult struct {
 		models.Doctor
 		DistanceKM      float64 `json:"distance_km"`
@@ -220,22 +218,15 @@ func (h *AppHandler) SmartMatchDoctors(w http.ResponseWriter, r *http.Request) {
 		TotalTimeToSeen int     `json:"total_time_to_seen_mins"`
 	}
 
-	var results []SmartMatchResult
-
-	// 3. Calculate times for all enrolled Kisumu doctors
+	// Calculate base metrics for all valid doctors
+	var allResults []SmartMatchResult
 	for _, doc := range h.Store.Doctors {
 		if doc.City == "Kisumu" && doc.IsEnrolled {
-			// Calculate Distance
 			dist := haversineDistance(userLat, userLng, doc.Lat, doc.Lng)
-			
-			// Estimate Travel Time: Assume 30 km/h average city speed (0.5 km/min)
-			// Travel Time = Distance / 0.5 -> which is Distance * 2
-			travelTime := int(math.Round(dist * 2)) 
-
-			// Estimate Wait Time: Queue length * Average consultation time
+			travelTime := int(math.Round(dist * 2)) // Assuming 0.5 km/min city driving
 			waitTime := doc.CurrentQueue * doc.AvgConsultTime
 
-			results = append(results, SmartMatchResult{
+			allResults = append(allResults, SmartMatchResult{
 				Doctor:          doc,
 				DistanceKM:      math.Round(dist*100) / 100,
 				EstTravelTime:   travelTime,
@@ -245,12 +236,41 @@ func (h *AppHandler) SmartMatchDoctors(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 4. Sort the results: Smallest "TotalTimeToSeen" goes first (The Equalizer)
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].TotalTimeToSeen < results[j].TotalTimeToSeen
+	// Create categorized response structure
+	type CategorizedResponse struct {
+		QuickestAvailable    []SmartMatchResult `json:"quickest_available"`
+		TopRatedIndependents []SmartMatchResult `json:"top_rated_independents"`
+		TopRatedOverall      []SmartMatchResult `json:"top_rated_overall"`
+	}
+
+	response := CategorizedResponse{
+		QuickestAvailable:    make([]SmartMatchResult, len(allResults)),
+		TopRatedOverall:      make([]SmartMatchResult, len(allResults)),
+		TopRatedIndependents: []SmartMatchResult{}, // Will append dynamically
+	}
+
+	// 1. Populate Quickest Available (Sort by TotalTimeToSeen Ascending)
+	copy(response.QuickestAvailable, allResults)
+	sort.Slice(response.QuickestAvailable, func(i, j int) bool {
+		return response.QuickestAvailable[i].TotalTimeToSeen < response.QuickestAvailable[j].TotalTimeToSeen
 	})
 
-	// 5. Return the sorted optimal list
+	// 2. Populate Top Rated Overall (Sort by Rating Descending)
+	copy(response.TopRatedOverall, allResults)
+	sort.Slice(response.TopRatedOverall, func(i, j int) bool {
+		return response.TopRatedOverall[i].Rating > response.TopRatedOverall[j].Rating
+	})
+
+	// 3. Populate Top Rated Independents (Filter by !IsContractual, Sort by Rating Descending)
+	for _, res := range allResults {
+		if !res.IsContractual {
+			response.TopRatedIndependents = append(response.TopRatedIndependents, res)
+		}
+	}
+	sort.Slice(response.TopRatedIndependents, func(i, j int) bool {
+		return response.TopRatedIndependents[i].Rating > response.TopRatedIndependents[j].Rating
+	})
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	json.NewEncoder(w).Encode(response)
 }
