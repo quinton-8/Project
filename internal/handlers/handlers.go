@@ -11,6 +11,10 @@ import (
 
 	"github.com/quinton-8/project/internal/database"
 	"github.com/quinton-8/project/internal/models"
+
+	"context"
+	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/api/option"
 )
 
 type AppHandler struct {
@@ -273,4 +277,70 @@ func (h *AppHandler) SmartMatchDoctors(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *AppHandler) AIRecommendDoctors(w http.ResponseWriter, r *http.Request) {
+	// 1. Get user query and location
+	userPreference := r.URL.Query().Get("preference") // e.g., "I don't care about distance, I just want the highest rated doctor"
+	latStr := r.URL.Query().Get("lat")
+	lngStr := r.URL.Query().Get("lng")
+
+	if userPreference == "" || latStr == "" || lngStr == "" {
+		http.Error(w, "Missing preference, lat, or lng", http.StatusBadRequest)
+		return
+	}
+
+	userLat, _ := strconv.ParseFloat(latStr, 64)
+	userLng, _ := strconv.ParseFloat(lngStr, 64)
+
+	// 2. Gather system data & calculate metrics
+	var availableData string
+	for _, doc := range h.Store.Doctors {
+		if doc.City == "Kisumu" && doc.IsEnrolled {
+			dist := haversineDistance(userLat, userLng, doc.Lat, doc.Lng)
+			travelTime := int(math.Round(dist * 2)) // 0.5 km/min
+			waitTime := doc.CurrentQueue * doc.AvgConsultTime
+			totalTime := travelTime + waitTime
+            
+            // Format doctor details into a readable string for the AI
+			availableData += fmt.Sprintf(
+				"- %s (ID: %s, %s at %s). Dist: %.1f km, Wait: %d mins, Total Time to Seen: %d mins, Rating: %.1f, Contractual: %t\n",
+				doc.Name, doc.ID, doc.Specialty, doc.Hospital, dist, waitTime, totalTime, doc.Rating, doc.IsContractual,
+			)
+		}
+	}
+
+	// 3. Initialize Gemini
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
+	if err != nil {
+		http.Error(w, "AI Initialization failed", http.StatusInternalServerError)
+		return
+	}
+	defer client.Close()
+
+	model := client.GenerativeModel("gemini-2.5-flash") // Fast and cheap for text summarization
+	
+	// 4. Construct the Prompt with System Data
+	systemInstruction := `You are Taifa Care's AI Assistant. Your job is to read the live database of available doctors provided below, compare it against the user's specific preferences, and write a short, friendly summary recommending the best 1 or 2 options. Do not make up doctors. Use only the data provided.
+
+LIVE DOCTOR DATA:
+` + availableData
+
+	model.SystemInstruction = &genai.Content{
+		Parts: []genai.Part{genai.Text(systemInstruction)},
+	}
+
+	// 5. Send to AI
+	resp, err := model.GenerateContent(ctx, genai.Text("User Preference: " + userPreference))
+	if err != nil {
+		http.Error(w, "Failed to generate AI response", http.StatusInternalServerError)
+		return
+	}
+
+	// 6. Return the AI Summary
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"ai_summary": string(resp.Candidates[0].Content.Parts[0].(genai.Text)),
+	})
 }
