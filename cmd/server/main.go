@@ -29,6 +29,9 @@ func main() {
 	http.HandleFunc("GET /hospitals/nearest", appHandlers.GetNearestHospitals)
 	http.HandleFunc("GET /doctors/smart-match", appHandlers.SmartMatchDoctors)
 
+	// NEW AI ROUTE
+    http.HandleFunc("GET /ai/recommend", appHandlers.AIRecommendDoctors)
+
 	log.Println("Server running on port 8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
