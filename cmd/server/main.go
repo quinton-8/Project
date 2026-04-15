@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"github.com/joho/godotenv"
 	"github.com/quinton-8/project/internal/database"
 	"github.com/quinton-8/project/internal/handlers"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: No .env file found. Relying on system environment variables.")
+	}
     fmt.Println("Starting Taifa Care Server...")
 
 	// Initialize our in-memory database with seed data
