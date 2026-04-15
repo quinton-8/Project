@@ -38,6 +38,8 @@ type Appointment struct {
 	PickupPoint    string
 	TransportCost  float64
 	Status         string // "pending", "confirmed", "cancelled"
+	DepartureTime  time.Time `json:"departure_time,omitempty"`
+	ReminderTime   time.Time `json:"reminder_time,omitempty"`
 }
 
 // Hospital represents a physical location for checkups

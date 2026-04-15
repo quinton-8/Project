@@ -63,10 +63,10 @@ func (h *AppHandler) BookAppointment(w http.ResponseWriter, r *http.Request) {
 	// 3. Logic for transport
 	message := "Schedule proposed."
 	if req.NeedsTransport {
-		message += " Please confirm your transport departure time via the SMS link sent."
+		message += "Please select and confirm your departure time to finalize the booking."
 		// Note: Here you would integrate an SMS service like Twilio or Africa's Talking later
 	} else {
-		message += " An SMS reminder will be sent shortly."
+		message += " Please confirm your appointment in the app. An SMS reminder will be scheduled."
 	}
 
 	// 4. Save to our in-memory store
@@ -86,9 +86,16 @@ func (h *AppHandler) BookAppointment(w http.ResponseWriter, r *http.Request) {
 
 // ConfirmAppointment finalizes the booking after transport/time agreement
 func (h *AppHandler) ConfirmAppointment(w http.ResponseWriter, r *http.Request) {
+	// Define the new expected payload from the frontend
 	var req struct {
-		AppointmentID string `json:"appointment_id"`
+		AppointmentID      string  `json:"appointment_id"`
+		DepartureTime      string  `json:"departure_time"`       // e.g., "2026-04-15T14:00:00Z"
+		ReminderMode       string  `json:"reminder_mode"`        // "auto" or "custom"
+		CustomReminderMins int     `json:"custom_reminder_mins"` // If custom, how many mins before?
+		UserLat            float64 `json:"user_lat"`             // Needed for auto distance calc
+		UserLng            float64 `json:"user_lng"`             // Needed for auto distance calc
 	}
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
@@ -105,13 +112,49 @@ func (h *AppHandler) ConfirmAppointment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Parse the departure time chosen in the app
+	depTime, err := time.Parse(time.RFC3339, req.DepartureTime)
+	if err == nil {
+		app.DepartureTime = depTime
+	} else {
+		// Fallback to now if frontend sends bad data
+		app.DepartureTime = time.Now().Add(1 * time.Hour) 
+	}
+
+	// REMINDER CALCULATION LOGIC
+	var reminderTime time.Time
+
+	if req.ReminderMode == "auto" {
+		// Auto calculate based on distance to the doctor
+		doc, docExists := h.Store.Doctors[app.DoctorID]
+		if docExists {
+			dist := haversineDistance(req.UserLat, req.UserLng, doc.Lat, doc.Lng)
+			travelTimeMins := int(math.Round(dist * 2)) // Assuming 0.5 km/min in city traffic
+			
+			// Set reminder 15 minutes BEFORE they need to start traveling
+			totalBufferMins := travelTimeMins + 15
+			reminderTime = app.DepartureTime.Add(-time.Duration(totalBufferMins) * time.Minute)
+		} else {
+			// Fallback if doctor isn't found
+			reminderTime = app.DepartureTime.Add(-30 * time.Minute)
+		}
+	} else if req.ReminderMode == "custom" {
+		// User explicitly selected something like "Remind me 45 mins before"
+		reminderTime = app.DepartureTime.Add(-time.Duration(req.CustomReminderMins) * time.Minute)
+	} else {
+		// Default fallback
+		reminderTime = app.DepartureTime.Add(-30 * time.Minute)
+	}
+
+	// Update the appointment record
+	app.ReminderTime = reminderTime
 	app.Status = "confirmed"
 	h.Store.UpdateAppointment(app)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Appointment and transport departure time successfully confirmed.",
-		"status":  app.Status,
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":      "Appointment confirmed. SMS reminder scheduled successfully.",
+		"appointment":  app,
 	})
 }
 
