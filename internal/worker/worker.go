@@ -25,7 +25,7 @@ func StartReminderJob(store *database.DataStore) {
 func checkAndSendReminders(store *database.DataStore) {
 	now := time.Now()
 
-	for id, app := range store.Appointments {
+	for _, app := range store.Appointments {
 		// Only look at confirmed appointments that haven't received an SMS yet
 		if app.Status == "confirmed" && !app.ReminderSent {
 			// If the current time has passed the target ReminderTime
