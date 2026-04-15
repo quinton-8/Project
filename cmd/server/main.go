@@ -18,22 +18,23 @@ func main() {
 	// Initialize handlers with the store
 	appHandlers := handlers.NewAppHandler(store)
 
+	mux := http.NewServeMux()
 	// Routes
-	http.HandleFunc("GET /", appHandlers.HealthCheck)
-	http.HandleFunc("GET /doctors", appHandlers.GetDoctors)
-	http.HandleFunc("POST /appointments/book", appHandlers.BookAppointment)
+	mux.HandleFunc("GET /", appHandlers.HealthCheck)
+	mux.HandleFunc("GET /doctors", appHandlers.GetDoctors)
+	mux.HandleFunc("POST /appointments/book", appHandlers.BookAppointment)
 	
 	// New Routes for expanding logic
-	http.HandleFunc("POST /appointments/confirm", appHandlers.ConfirmAppointment)
-	http.HandleFunc("POST /appointments/cancel", appHandlers.CancelAppointment)
-	http.HandleFunc("GET /hospitals/nearest", appHandlers.GetNearestHospitals)
-	http.HandleFunc("GET /doctors/smart-match", appHandlers.SmartMatchDoctors)
+	mux.HandleFunc("POST /appointments/confirm", appHandlers.ConfirmAppointment)
+	mux.HandleFunc("POST /appointments/cancel", appHandlers.CancelAppointment)
+	mux.HandleFunc("GET /hospitals/nearest", appHandlers.GetNearestHospitals)
+	mux.HandleFunc("GET /doctors/smart-match", appHandlers.SmartMatchDoctors)
 
 	// NEW AI ROUTE
-    http.HandleFunc("GET /ai/recommend", appHandlers.AIRecommendDoctors)
+    mux.HandleFunc("GET /ai/recommend", appHandlers.AIRecommendDoctors)
 
 	log.Println("Server running on port 8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }
