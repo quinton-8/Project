@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
 	"github.com/joho/godotenv"
 	"github.com/quinton-8/project/internal/database"
 	"github.com/quinton-8/project/internal/handlers"
+	"github.com/quinton-8/project/internal/worker"
 )
 
 func main() {
@@ -36,6 +38,9 @@ func main() {
 
 	// NEW AI ROUTE
     mux.HandleFunc("GET /ai/recommend", appHandlers.AIRecommendDoctors)
+
+	// START THE BACKGROUND WORKER
+	go worker.StartReminderJob(store)
 
 	log.Println("Server running on port 8080")
 	if err := http.ListenAndServe(":8080", mux); err != nil {

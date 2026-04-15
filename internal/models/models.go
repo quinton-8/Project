@@ -40,6 +40,7 @@ type Appointment struct {
 	Status         string // "pending", "confirmed", "cancelled"
 	DepartureTime  time.Time `json:"departure_time,omitempty"`
 	ReminderTime   time.Time `json:"reminder_time,omitempty"`
+	ReminderSent   bool      `json:"reminder_sent"`
 }
 
 // Hospital represents a physical location for checkups
